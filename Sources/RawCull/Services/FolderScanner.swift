@@ -1,12 +1,29 @@
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 struct FolderScanner {
-    static let supportedExtensions: Set<String> = [
-        "arw", "cr3", "cr2", "nef", "dng", "raf", "orf", "rw2",
-        // Also support common image formats for testing
-        "jpg", "jpeg", "heic", "tiff", "tif"
-    ]
+    /// Every type identifier ImageIO can decode, computed once and cached.
+    private static let decodableTypeIdentifiers: Set<String> = {
+        let identifiers = CGImageSourceCopyTypeIdentifiers() as? [String] ?? []
+        return Set(identifiers)
+    }()
+
+    /// True if the file's UTType (from its path extension) conforms to
+    /// `UTType.image` and ImageIO can decode it (the type, or a type it
+    /// conforms to, is in `CGImageSourceCopyTypeIdentifiers()`).
+    static func isSupported(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension) else {
+            return false
+        }
+        guard type.conforms(to: .image) else {
+            return false
+        }
+        return decodableTypeIdentifiers.contains { identifier in
+            guard let decodableType = UTType(identifier) else { return false }
+            return type.conforms(to: decodableType)
+        }
+    }
 
     /// Scans a folder for supported image files, sorted by filename.
     static func scan(folderURL: URL) -> [URL] {
@@ -21,8 +38,7 @@ struct FolderScanner {
 
         var urls: [URL] = []
         for case let fileURL as URL in enumerator {
-            let ext = fileURL.pathExtension.lowercased()
-            if supportedExtensions.contains(ext) {
+            if isSupported(fileURL) {
                 urls.append(fileURL)
             }
         }

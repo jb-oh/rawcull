@@ -9,6 +9,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "RawCull"
+        ),
+        .testTarget(
+            name: "RawCullTests",
+            dependencies: ["RawCull"]
         )
     ]
 )
