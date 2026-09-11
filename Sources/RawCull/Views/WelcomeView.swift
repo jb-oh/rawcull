@@ -22,7 +22,7 @@ struct WelcomeView: View {
             Text("RawCull")
                 .font(.largeTitle.bold())
 
-            Text("Drop a folder of RAW photos to start culling")
+            Text("Drop a folder of photos to start culling")
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
@@ -75,7 +75,7 @@ struct WelcomeView: View {
         .alert("No Photos Found", isPresented: $showEmptyAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("No supported RAW or image files were found in the selected folder.")
+            Text("No supported image files were found in the selected folder.")
         }
     }
 
@@ -84,7 +84,7 @@ struct WelcomeView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Select a folder containing RAW photos"
+        panel.message = "Select a folder containing photos"
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         processFolder(url)

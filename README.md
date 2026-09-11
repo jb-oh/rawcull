@@ -59,24 +59,9 @@ Important:
 
 # Supported File Types
 
-Raw formats:
+RawCull accepts any image format that macOS can decode through ImageIO. This includes camera RAW formats (for example ARW, CR3, NEF, DNG, RAF, PEF) and common formats (JPEG, HEIC, PNG, TIFF, WebP, GIF).
 
-- `arw`
-- `cr3`
-- `cr2`
-- `nef`
-- `dng`
-- `raf`
-- `orf`
-- `rw2`
-
-Common image formats:
-
-- `jpg`
-- `jpeg`
-- `heic`
-- `tiff`
-- `tif`
+Animated or multi-page files show their first frame.
 
 # Keyboard Shortcuts
 
