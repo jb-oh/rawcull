@@ -12,7 +12,9 @@ struct FolderTreePanel: View {
         List(selection: selectionBinding) {
             FolderTreeRow(node: root, expandedURLs: $expandedURLs)
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
             expandedURLs.insert(root.url)
         }
