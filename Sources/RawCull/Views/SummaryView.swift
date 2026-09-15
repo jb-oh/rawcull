@@ -44,7 +44,7 @@ struct SummaryView: View {
 
                 if session.undecidedCount > 0 {
                     Label(
-                        "\(session.undecidedCount) photos are undecided — they will stay in place",
+                        "\(session.undecidedCount) photos are undecided. They will stay in place.",
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(.orange)
