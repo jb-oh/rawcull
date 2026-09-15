@@ -7,9 +7,10 @@ struct FolderTreePanel: View {
     let selectedURL: URL?
     @Binding var expandedURLs: Set<URL>
     let onSelect: (URL) -> Void
+    @State private var selection: URL?
 
     var body: some View {
-        List(selection: selectionBinding) {
+        List(selection: $selection) {
             FolderTreeRow(node: root, expandedURLs: $expandedURLs)
         }
         .listStyle(.inset)
@@ -17,26 +18,29 @@ struct FolderTreePanel: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear {
             expandedURLs.insert(root.url)
+            syncSelection()
         }
         .onChange(of: root) { _, newRoot in
             expandedURLs.insert(newRoot.url)
+            syncSelection()
+        }
+        .onChange(of: selectedURL) { _, _ in
+            syncSelection()
+        }
+        .onChange(of: selection) { _, newValue in
+            guard let newValue, newValue.path != selectedURL?.path else { return }
+            onSelect(newValue)
         }
     }
 
-    /// Maps the session's folder URL onto the matching tree node by path, and
-    /// forwards row clicks to `onSelect`.
-    private var selectionBinding: Binding<URL?> {
-        Binding(
-            get: {
-                guard let selectedPath = selectedURL?.path else { return nil }
-                return root.first(where: { $0.url.path == selectedPath })?.url
-            },
-            set: { newValue in
-                if let newValue {
-                    onSelect(newValue)
-                }
-            }
-        )
+    /// Mirrors the session's folder into the list selection, matching by path
+    /// because URL equality is sensitive to a trailing slash.
+    private func syncSelection() {
+        guard let selectedPath = selectedURL?.path else {
+            selection = nil
+            return
+        }
+        selection = root.first(where: { $0.url.path == selectedPath })?.url
     }
 }
 
