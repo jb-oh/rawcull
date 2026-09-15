@@ -101,6 +101,13 @@ final class CullSession {
         saveSession()
     }
 
+    /// Drops any pending debounced save without deleting the session file.
+    func discardPendingSave() {
+        saveTask?.cancel()
+        saveTask = nil
+        hasPendingSave = false
+    }
+
     private func scheduleSave() {
         hasPendingSave = true
         saveTask?.cancel()

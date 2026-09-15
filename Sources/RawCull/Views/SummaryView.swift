@@ -65,7 +65,7 @@ struct SummaryView: View {
                         Text("All folders under \(rootURL.lastPathComponent)")
                             .font(.headline)
                         if let totals {
-                            SummaryRow(label: "Folders with decisions", count: totals.folders, color: .secondary, icon: "folder")
+                            SummaryRow(label: "Folders with sessions", count: totals.folders, color: .secondary, icon: "folder")
                             SummaryRow(label: "Picks", count: totals.picks, color: .green, icon: "checkmark.circle.fill")
                             SummaryRow(label: "Rejects", count: totals.rejects, color: .red, icon: "xmark.circle.fill")
                             SummaryRow(label: "Undecided", count: totals.undecided, color: .secondary, icon: "questionmark.circle")
@@ -131,32 +131,33 @@ struct SummaryView: View {
 
     private func moveFiles() {
         guard let folderURL = session.folderURL else { return }
+        let items = session.items
         isMoving = true
         moveError = nil
+        moveProgress = 0
 
         Task {
+            let (stream, continuation) = AsyncStream<Double>.makeStream()
+            let work = Task.detached(priority: .userInitiated) {
+                defer { continuation.finish() }
+                return try FileMover.moveFiles(items: items, folderURL: folderURL) { completed, total in
+                    continuation.yield(total == 0 ? 1 : Double(completed) / Double(total))
+                }
+            }
+
+            for await fraction in stream {
+                moveProgress = fraction
+            }
+
             do {
-                let result = try FileMover.moveFiles(
-                    items: session.items,
-                    folderURL: folderURL
-                ) { completed, total in
-                    Task { @MainActor in
-                        moveProgress = Double(completed) / Double(total)
-                    }
-                }
-
+                let result = try await work.value
                 session.deleteSessionFile()
-
-                await MainActor.run {
-                    isMoving = false
-                    moveComplete = true
-                    resultMessage = "\(result.picks) picks moved to Picks/, \(result.rejects) rejects moved to Rejects/"
-                }
+                isMoving = false
+                moveComplete = true
+                resultMessage = "\(result.picks) picks moved to Picks/, \(result.rejects) rejects moved to Rejects/"
             } catch {
-                await MainActor.run {
-                    isMoving = false
-                    moveError = error.localizedDescription
-                }
+                isMoving = false
+                moveError = error.localizedDescription
             }
         }
     }
@@ -166,29 +167,34 @@ struct SummaryView: View {
         session.flushSave()
         isMoving = true
         moveError = nil
+        moveProgress = 0
 
         Task {
+            let (stream, continuation) = AsyncStream<Double>.makeStream()
+            let work = Task.detached(priority: .userInitiated) {
+                defer { continuation.finish() }
+                return try FileMover.moveAllSessions(rootURL: rootURL) { completed, total in
+                    continuation.yield(total == 0 ? 1 : Double(completed) / Double(total))
+                }
+            }
+
+            for await fraction in stream {
+                moveProgress = fraction
+            }
+
             do {
-                let result = try FileMover.moveAllSessions(rootURL: rootURL) { completed, total in
-                    Task { @MainActor in
-                        moveProgress = total == 0 ? 1 : Double(completed) / Double(total)
-                    }
-                }
-
-                // The current folder's file is already gone; this clears any
-                // pending debounced save so it cannot come back.
-                session.deleteSessionFile()
-
-                await MainActor.run {
-                    isMoving = false
-                    moveComplete = true
-                    resultMessage = "\(result.picks) picks and \(result.rejects) rejects moved across \(result.folders) folders"
-                }
+                let result = try await work.value
+                // The current folder's file may already be gone if it was part
+                // of the move. This drops any pending debounced save without
+                // touching the file, so a folder the move skipped keeps its
+                // saved state.
+                session.discardPendingSave()
+                isMoving = false
+                moveComplete = true
+                resultMessage = "\(result.picks) picks and \(result.rejects) rejects moved across \(result.folders) folders"
             } catch {
-                await MainActor.run {
-                    isMoving = false
-                    moveError = error.localizedDescription
-                }
+                isMoving = false
+                moveError = error.localizedDescription
             }
         }
     }

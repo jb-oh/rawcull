@@ -80,4 +80,41 @@ struct FileMoverTests {
         #expect(!exists(root, "A/Picks/a1.png"))
         #expect(exists(root, "A/Rejects/a2.png"))
     }
+
+    @Test func moveAllSessionsIncludesTheRootFolderItself() throws {
+        let root = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        FileManager.default.createFile(atPath: root.appendingPathComponent("r1.png").path, contents: Data())
+        try writeSession(in: root, decisions: ["r1.png": .pick])
+
+        #expect(FileMover.sessionTotals(rootURL: root) == SessionTotals(folders: 4, picks: 3, rejects: 1, undecided: 2))
+
+        let result = try FileMover.moveAllSessions(rootURL: root) { _, _ in }
+
+        #expect(result == TreeMoveResult(folders: 3, picks: 3, rejects: 1))
+        #expect(exists(root, "Picks/r1.png"))
+        #expect(!exists(root, ".rawcull-session.json"))
+    }
+
+    @Test func moveAllSessionsStopsAtTheFirstFailureAndNamesTheFolder() throws {
+        let root = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Make A/Sub/Picks/s1.png already exist so its move collides.
+        let subPicks = root.appendingPathComponent("A/Sub/Picks")
+        try FileManager.default.createDirectory(at: subPicks, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: subPicks.appendingPathComponent("s1.png").path, contents: Data())
+
+        do {
+            _ = try FileMover.moveAllSessions(rootURL: root) { _, _ in }
+            Issue.record("expected throw")
+        } catch let error as FileMover.MoveError {
+            #expect(error.errorDescription?.contains("Sub/s1.png") == true)
+        }
+
+        // A was walked first and stays moved, with its session gone.
+        #expect(exists(root, "A/Picks/a1.png"))
+        #expect(!exists(root, "A/.rawcull-session.json"))
+        // A/Sub failed, so its session file must survive.
+        #expect(exists(root, "A/Sub/.rawcull-session.json"))
+    }
 }
