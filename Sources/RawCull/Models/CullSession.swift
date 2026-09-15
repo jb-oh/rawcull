@@ -61,9 +61,7 @@ final class CullSession {
         self.folderURL = folderURL
 
         // Check for existing session
-        let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
-        if let data = try? Data(contentsOf: sessionURL),
-           let saved = try? JSONDecoder().decode(SavedSession.self, from: data) {
+        if let saved = SavedSession.load(from: folderURL) {
             self.items = fileURLs.map { url in
                 let decision = saved.decisions[url.lastPathComponent] ?? .undecided
                 return PhotoItem(url: url, decision: decision)
@@ -115,7 +113,7 @@ final class CullSession {
 
     private func saveSession() {
         guard let folderURL else { return }
-        let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
+        let sessionURL = SavedSession.url(in: folderURL)
         var decisions: [String: Decision] = [:]
         for item in items {
             decisions[item.filename] = item.decision
@@ -136,7 +134,7 @@ final class CullSession {
         saveTask = nil
         hasPendingSave = false
         guard let folderURL else { return }
-        let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
+        let sessionURL = SavedSession.url(in: folderURL)
         try? FileManager.default.removeItem(at: sessionURL)
     }
 
@@ -185,12 +183,4 @@ final class CullSession {
             undecidedCount += 1
         }
     }
-}
-
-// MARK: - Saved Session Format
-
-private struct SavedSession: Codable {
-    let version: Int
-    let currentIndex: Int
-    let decisions: [String: Decision]
 }
