@@ -27,7 +27,7 @@ struct SummaryView: View {
                     .font(.title3)
                     .foregroundStyle(.secondary)
 
-                Button("Back to Start") {
+                Button("Continue") {
                     onComplete()
                 }
                 .buttonStyle(.borderedProminent)

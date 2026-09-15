@@ -4,14 +4,30 @@ import SwiftUI
 struct CullingView: View {
     @Environment(CullSession.self) private var session
     @Environment(ImageLoader.self) private var imageLoader
+    let folderTree: FolderNode?
+    let onSelectFolder: (URL) -> Void
     let onFinish: () -> Void
+    let onCloseFolder: () -> Void
 
     @State private var isZoomed = false
     @State private var rotationQuarterTurns = 0
     @State private var showSidebar = true
+    @State private var showFolderTree = true
 
     var body: some View {
         HStack(spacing: 0) {
+            // Folder tree
+            if showFolderTree, let folderTree {
+                FolderTreePanel(
+                    root: folderTree,
+                    selectedURL: session.folderURL,
+                    onSelect: onSelectFolder
+                )
+                .frame(width: 200)
+
+                Divider()
+            }
+
             // Thumbnail sidebar
             if showSidebar {
                 ThumbnailSidebar()
@@ -55,6 +71,11 @@ struct CullingView: View {
             WindowFocusActivator()
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("Close Folder") {
+                    onCloseFolder()
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Finish") {
                     onFinish()
@@ -66,6 +87,9 @@ struct CullingView: View {
         .onChange(of: session.currentIndex) { _, newIndex in
             resetView()
             imageLoader.prefetch(around: newIndex)
+        }
+        .onChange(of: session.folderURL) { _, _ in
+            resetView()
         }
         .onChange(of: isZoomed) { _, newValue in
             guard newValue, let item = session.currentItem else { return }
@@ -175,6 +199,9 @@ struct CullingView: View {
             return true
         case "t":
             showSidebar.toggle()
+            return true
+        case "f", "ㄹ":
+            showFolderTree.toggle()
             return true
         default:
             return false
