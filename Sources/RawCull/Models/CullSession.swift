@@ -115,7 +115,6 @@ final class CullSession {
 
     private func saveSession() {
         guard let folderURL else { return }
-        hasPendingSave = false
         let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
         var decisions: [String: Decision] = [:]
         for item in items {
@@ -126,8 +125,9 @@ final class CullSession {
             currentIndex: currentIndex,
             decisions: decisions
         )
-        if let data = try? JSONEncoder().encode(saved) {
-            try? data.write(to: sessionURL, options: .atomic)
+        if let data = try? JSONEncoder().encode(saved),
+           (try? data.write(to: sessionURL, options: .atomic)) != nil {
+            hasPendingSave = false
         }
     }
 

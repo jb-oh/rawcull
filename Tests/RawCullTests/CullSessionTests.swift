@@ -87,4 +87,27 @@ struct CullSessionTests {
         try await Task.sleep(for: .seconds(1.5))
         #expect(try savedDecisions(in: folder) == nil)
     }
+
+    @Test func pendingFlagSurvivesFailedWrite() throws {
+        let folder = try makeFolder(files: ["a.png"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let session = CullSession()
+        session.load(folderURL: folder, fileURLs: FolderScanner.scan(folderURL: folder))
+        session.markPick()
+
+        // Delete the folder to cause the write to fail.
+        try FileManager.default.removeItem(at: folder)
+
+        // flushSave() will attempt to write but fail (folder doesn't exist).
+        session.flushSave()
+
+        // Recreate the folder so we can write to it again.
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        // flushSave() again; the flag should still be set, so it writes now.
+        session.flushSave()
+
+        #expect(try savedDecisions(in: folder)?["a.png"] == "pick")
+    }
 }
