@@ -36,7 +36,8 @@ struct ContentView: View {
                 SummaryView(
                     onGoBack: { appState = .culling },
                     onComplete: continueAfterMove,
-                    isContinuing: isContinuing
+                    isContinuing: isContinuing,
+                    rootURL: rootURL
                 )
             }
         }

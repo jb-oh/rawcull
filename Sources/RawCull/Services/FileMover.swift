@@ -129,8 +129,13 @@ struct FileMover {
 
         for entry in pending {
             let base = movedSoFar
-            let result = try moveFiles(items: entry.items, folderURL: entry.folderURL) { completed, _ in
-                progress(base + completed, total)
+            let result: (picks: Int, rejects: Int)
+            do {
+                result = try moveFiles(items: entry.items, folderURL: entry.folderURL) { completed, _ in
+                    progress(base + completed, total)
+                }
+            } catch MoveError.moveFailed(let file, let reason) {
+                throw MoveError.moveFailed("\(entry.folderURL.lastPathComponent)/\(file)", reason)
             }
             movedSoFar += result.picks + result.rejects
             folders += 1

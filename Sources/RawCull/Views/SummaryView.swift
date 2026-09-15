@@ -5,12 +5,14 @@ struct SummaryView: View {
     let onGoBack: () -> Void
     let onComplete: () -> Void
     let isContinuing: Bool
+    let rootURL: URL?
 
     @State private var isMoving = false
     @State private var moveProgress = 0.0
     @State private var moveError: String?
     @State private var moveComplete = false
     @State private var resultMessage = ""
+    @State private var totals: SessionTotals?
 
     var body: some View {
         VStack(spacing: 24) {
@@ -58,6 +60,24 @@ struct SummaryView: View {
                     .font(.callout)
                 }
 
+                if let rootURL {
+                    VStack(spacing: 8) {
+                        Text("All folders under \(rootURL.lastPathComponent)")
+                            .font(.headline)
+                        if let totals {
+                            SummaryRow(label: "Folders with decisions", count: totals.folders, color: .secondary, icon: "folder")
+                            SummaryRow(label: "Picks", count: totals.picks, color: .green, icon: "checkmark.circle.fill")
+                            SummaryRow(label: "Rejects", count: totals.rejects, color: .red, icon: "xmark.circle.fill")
+                            SummaryRow(label: "Undecided", count: totals.undecided, color: .secondary, icon: "questionmark.circle")
+                        } else {
+                            ProgressView("Counting folders...")
+                                .controlSize(.small)
+                        }
+                    }
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary))
+                }
+
                 if isMoving {
                     ProgressView(value: moveProgress)
                         .frame(width: 300)
@@ -76,6 +96,14 @@ struct SummaryView: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .disabled(session.pickCount + session.rejectCount == 0)
+
+                        if rootURL != nil {
+                            Button("Move All Folders") {
+                                moveAllFolders()
+                            }
+                            .controlSize(.large)
+                            .disabled((totals?.picks ?? 0) + (totals?.rejects ?? 0) == 0)
+                        }
                     }
                 }
 
@@ -90,6 +118,15 @@ struct SummaryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
+        .task(id: rootURL) {
+            guard let rootURL else { return }
+            // Flush first so the folder being reviewed is counted from disk.
+            session.flushSave()
+            let computed = await Task.detached(priority: .userInitiated) {
+                FileMover.sessionTotals(rootURL: rootURL)
+            }.value
+            totals = computed
+        }
     }
 
     private func moveFiles() {
@@ -114,6 +151,38 @@ struct SummaryView: View {
                     isMoving = false
                     moveComplete = true
                     resultMessage = "\(result.picks) picks moved to Picks/, \(result.rejects) rejects moved to Rejects/"
+                }
+            } catch {
+                await MainActor.run {
+                    isMoving = false
+                    moveError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func moveAllFolders() {
+        guard let rootURL else { return }
+        session.flushSave()
+        isMoving = true
+        moveError = nil
+
+        Task {
+            do {
+                let result = try FileMover.moveAllSessions(rootURL: rootURL) { completed, total in
+                    Task { @MainActor in
+                        moveProgress = total == 0 ? 1 : Double(completed) / Double(total)
+                    }
+                }
+
+                // The current folder's file is already gone; this clears any
+                // pending debounced save so it cannot come back.
+                session.deleteSessionFile()
+
+                await MainActor.run {
+                    isMoving = false
+                    moveComplete = true
+                    resultMessage = "\(result.picks) picks and \(result.rejects) rejects moved across \(result.folders) folders"
                 }
             } catch {
                 await MainActor.run {

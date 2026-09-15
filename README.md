@@ -50,7 +50,7 @@ swift run
 4. Review photos one by one.
 5. Decisions are saved to `.rawcull-session.json` in the folder being reviewed.
 6. Press `Finish` when you are done with the current folder.
-7. On the summary screen, press `Move Files` to move accepted photos into `Picks/` and rejected photos into `Rejects/`, then `Continue` to go back to the tree.
+7. On the summary screen, press `Move Files` to move this folder's accepted photos into `Picks/` and rejected photos into `Rejects/`. Press `Move All Folders` to do the same for every folder under the root that has saved decisions, each into its own `Picks/` and `Rejects/`. Then press `Continue` to go back to the tree.
 8. Press `Close Folder` to return to the start screen.
 
 Important:
