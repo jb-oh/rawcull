@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum AppState {
@@ -33,6 +34,9 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 600)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            session.flushSave()
+        }
     }
 
     private func startCulling(folderURL: URL, fileURLs: [URL]) {

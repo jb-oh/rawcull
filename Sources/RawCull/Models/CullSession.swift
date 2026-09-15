@@ -12,6 +12,8 @@ final class CullSession {
     private(set) var undecidedCount: Int = 0
 
     private var saveTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var hasPendingSave = false
     private(set) var folderURL: URL?
 
     // MARK: - Navigation
@@ -55,6 +57,7 @@ final class CullSession {
     // MARK: - Session Loading
 
     func load(folderURL: URL, fileURLs: [URL]) {
+        flushSave()
         self.folderURL = folderURL
 
         // Check for existing session
@@ -76,6 +79,9 @@ final class CullSession {
     }
 
     func reset() {
+        saveTask?.cancel()
+        saveTask = nil
+        hasPendingSave = false
         items = []
         currentIndex = 0
         pickCount = 0
@@ -83,12 +89,22 @@ final class CullSession {
         undecidedCount = 0
         folderURL = nil
         isLoaded = false
-        saveTask?.cancel()
     }
 
     // MARK: - Persistence
 
+    /// Writes any pending decisions to disk right away. Call before switching
+    /// folders, closing the folder, or quitting, so the one second debounce
+    /// in `scheduleSave()` cannot drop the last decision.
+    func flushSave() {
+        guard hasPendingSave else { return }
+        saveTask?.cancel()
+        saveTask = nil
+        saveSession()
+    }
+
     private func scheduleSave() {
+        hasPendingSave = true
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -99,6 +115,7 @@ final class CullSession {
 
     private func saveSession() {
         guard let folderURL else { return }
+        hasPendingSave = false
         let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
         var decisions: [String: Decision] = [:]
         for item in items {
@@ -115,6 +132,9 @@ final class CullSession {
     }
 
     func deleteSessionFile() {
+        saveTask?.cancel()
+        saveTask = nil
+        hasPendingSave = false
         guard let folderURL else { return }
         let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
         try? FileManager.default.removeItem(at: sessionURL)
