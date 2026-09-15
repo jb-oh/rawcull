@@ -63,6 +63,7 @@ private struct FolderTreeRow: View {
             .lineLimit(1)
             .truncationMode(.middle)
             .tag(node.url)
+            .listRowSeparator(.hidden)
     }
 
     private var expansionBinding: Binding<Bool> {
