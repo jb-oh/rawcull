@@ -44,4 +44,57 @@ struct FolderScannerTests {
         let url = URL(fileURLWithPath: "/tmp/test-file")
         #expect(!FolderScanner.isSupported(url))
     }
+
+    @Test func folderTreeBuildsNestedFoldersInNaturalOrderSkippingHiddenAndFiles() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        for path in ["Day 10", "Day 2", "Day 2/Raw", "Day 2/Jpeg", ".hidden"] {
+            try fileManager.createDirectory(
+                at: tempDir.appendingPathComponent(path),
+                withIntermediateDirectories: true
+            )
+        }
+        fileManager.createFile(atPath: tempDir.appendingPathComponent("a.png").path, contents: Data())
+
+        let tree = FolderScanner.folderTree(rootURL: tempDir)
+
+        #expect(tree.url == tempDir)
+        #expect(tree.name == tempDir.lastPathComponent)
+        #expect(tree.children.map(\.name) == ["Day 2", "Day 10"])
+        #expect(tree.children[0].children.map(\.name) == ["Jpeg", "Raw"])
+        #expect(tree.children[1].children.isEmpty)
+    }
+
+    @Test func folderTreeDoesNotFollowSymbolicLinks() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        try fileManager.createDirectory(
+            at: tempDir.appendingPathComponent("Real"),
+            withIntermediateDirectories: true
+        )
+        // A link back to the root would recurse forever if followed.
+        try fileManager.createSymbolicLink(
+            at: tempDir.appendingPathComponent("Link"),
+            withDestinationURL: tempDir
+        )
+
+        let tree = FolderScanner.folderTree(rootURL: tempDir)
+
+        #expect(tree.children.map(\.name) == ["Real"])
+    }
+
+    @Test func folderNodeFirstWhereSearchesDepthFirst() throws {
+        let leaf = FolderNode(url: URL(fileURLWithPath: "/r/a/b"), name: "b", children: [])
+        let mid = FolderNode(url: URL(fileURLWithPath: "/r/a"), name: "a", children: [leaf])
+        let root = FolderNode(url: URL(fileURLWithPath: "/r"), name: "r", children: [mid])
+
+        #expect(root.first(where: { $0.name == "b" })?.url == leaf.url)
+        #expect(root.first(where: { $0.name == "zzz" }) == nil)
+    }
 }

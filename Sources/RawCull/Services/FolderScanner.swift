@@ -48,6 +48,45 @@ struct FolderScanner {
         return urls
     }
 
+    /// Builds the folder tree rooted at `rootURL`. Hidden folders are skipped
+    /// and symbolic links are not followed, so a link back to an ancestor
+    /// cannot cause infinite recursion. Children are naturally sorted.
+    static func folderTree(rootURL: URL) -> FolderNode {
+        FolderNode(
+            url: rootURL,
+            name: rootURL.lastPathComponent,
+            children: subfolderNodes(of: rootURL)
+        )
+    }
+
+    private static func subfolderNodes(of folderURL: URL) -> [FolderNode] {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: folderURL,
+            includingPropertiesForKeys: Array(keys),
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var nodes: [FolderNode] = []
+        for url in contents {
+            guard let values = try? url.resourceValues(forKeys: keys),
+                  values.isSymbolicLink != true,
+                  values.isDirectory == true else {
+                continue
+            }
+            nodes.append(FolderNode(
+                url: url,
+                name: url.lastPathComponent,
+                children: subfolderNodes(of: url)
+            ))
+        }
+
+        nodes.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return nodes
+    }
+
     /// Checks if a session file exists in the given folder.
     static func hasExistingSession(in folderURL: URL) -> Bool {
         let sessionURL = folderURL.appendingPathComponent(".rawcull-session.json")
