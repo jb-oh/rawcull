@@ -5,9 +5,8 @@ import SwiftUI
 struct FolderTreePanel: View {
     let root: FolderNode
     let selectedURL: URL?
+    @Binding var expandedURLs: Set<URL>
     let onSelect: (URL) -> Void
-
-    @State private var expandedURLs: Set<URL> = []
 
     var body: some View {
         List(selection: selectionBinding) {
@@ -54,7 +53,6 @@ private struct FolderTreeRow: View {
             } label: {
                 label
             }
-            .tag(node.url)
         }
     }
 

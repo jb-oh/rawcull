@@ -4,6 +4,7 @@ struct SummaryView: View {
     @Environment(CullSession.self) private var session
     let onGoBack: () -> Void
     let onComplete: () -> Void
+    let isContinuing: Bool
 
     @State private var isMoving = false
     @State private var moveProgress = 0.0
@@ -32,6 +33,12 @@ struct SummaryView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(isContinuing)
+
+                if isContinuing {
+                    ProgressView("Reloading folder...")
+                        .controlSize(.small)
+                }
             } else {
                 // Stats
                 VStack(spacing: 12) {

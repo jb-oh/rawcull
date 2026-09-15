@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var folderTree: FolderNode?
     @State private var switchTask: Task<Void, Never>?
     @State private var pendingFolderURL: URL?
+    @State private var expandedFolderURLs: Set<URL> = []
+    @State private var isContinuing = false
 
     var body: some View {
         Group {
@@ -26,13 +28,15 @@ struct ContentView: View {
                     folderTree: folderTree,
                     onSelectFolder: switchFolder,
                     onFinish: { appState = .done },
-                    onCloseFolder: closeFolder
+                    onCloseFolder: closeFolder,
+                    expandedFolderURLs: $expandedFolderURLs
                 )
                 .environment(imageLoader)
             case .done:
                 SummaryView(
                     onGoBack: { appState = .culling },
-                    onComplete: continueAfterMove
+                    onComplete: continueAfterMove,
+                    isContinuing: isContinuing
                 )
             }
         }
@@ -46,6 +50,7 @@ struct ContentView: View {
 
     private func startCulling(folderURL: URL, fileURLs: [URL]) {
         rootURL = folderURL
+        expandedFolderURLs.insert(folderURL)
         session.load(folderURL: folderURL, fileURLs: fileURLs)
         imageLoader.startLoading(items: session.items, currentIndex: session.currentIndex)
         appState = .culling
@@ -90,7 +95,12 @@ struct ContentView: View {
             closeFolder()
             return
         }
-        loadFolder(current) { appState = .culling }
+        isContinuing = true
+        expandedFolderURLs.insert(current)
+        loadFolder(current) {
+            isContinuing = false
+            appState = .culling
+        }
         rebuildTree()
     }
 
@@ -103,6 +113,8 @@ struct ContentView: View {
         imageLoader.clearAll()
         rootURL = nil
         folderTree = nil
+        expandedFolderURLs = []
+        isContinuing = false
         appState = .welcome
     }
 

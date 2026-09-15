@@ -8,6 +8,7 @@ struct CullingView: View {
     let onSelectFolder: (URL) -> Void
     let onFinish: () -> Void
     let onCloseFolder: () -> Void
+    @Binding var expandedFolderURLs: Set<URL>
 
     @State private var isZoomed = false
     @State private var rotationQuarterTurns = 0
@@ -21,6 +22,7 @@ struct CullingView: View {
                 FolderTreePanel(
                     root: folderTree,
                     selectedURL: session.folderURL,
+                    expandedURLs: $expandedFolderURLs,
                     onSelect: onSelectFolder
                 )
                 .frame(width: 200)

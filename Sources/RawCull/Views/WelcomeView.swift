@@ -75,7 +75,7 @@ struct WelcomeView: View {
         .alert("No Photos Found", isPresented: $showEmptyAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("No supported image files were found in the selected folder.")
+            Text("No supported image files or subfolders were found in the selected folder.")
         }
     }
 
@@ -111,12 +111,13 @@ struct WelcomeView: View {
 
         Task.detached(priority: .userInitiated) {
             let fileURLs = FolderScanner.scan(folderURL: url)
+            let tree = FolderScanner.folderTree(rootURL: url)
             let hasExistingSession = FolderScanner.hasExistingSession(in: url)
 
             await MainActor.run {
                 isProcessingFolder = false
 
-                guard !fileURLs.isEmpty else {
+                guard !fileURLs.isEmpty || !tree.children.isEmpty else {
                     showEmptyAlert = true
                     return
                 }
