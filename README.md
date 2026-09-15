@@ -16,7 +16,7 @@ This project is an early local prototype.
 
 Current scope:
 
-- single-folder culling
+- folder tree: open a root folder and cull each subfolder in turn
 - resumable decisions via `.rawcull-session.json`
 - thumbnail sidebar
 - keyboard navigation
@@ -44,12 +44,14 @@ swift run
 
 # How It Works
 
-1. Open or drop a folder of supported image files.
-2. RawCull scans the top level of that folder.
-3. Review photos one by one.
-4. Decisions are saved to `.rawcull-session.json` in the source folder.
-5. Press `Finish` when you are done reviewing.
-6. On the summary screen, press `Move Files` to move accepted photos into `Picks/` and rejected photos into `Rejects/`.
+1. Open or drop a root folder.
+2. RawCull scans the top level of that folder and shows a tree of its subfolders on the left.
+3. Click any folder in the tree to review the photos directly inside it. Each folder keeps its own session and its own `Picks/` and `Rejects/`.
+4. Review photos one by one.
+5. Decisions are saved to `.rawcull-session.json` in the folder being reviewed.
+6. Press `Finish` when you are done with the current folder.
+7. On the summary screen, press `Move Files` to move accepted photos into `Picks/` and rejected photos into `Rejects/`, then `Continue` to go back to the tree.
+8. Press `Close Folder` to return to the start screen.
 
 Important:
 
@@ -83,6 +85,7 @@ View controls:
 - `X`: reset zoom and rotation
 - `C`: rotate clockwise
 - `T`: toggle thumbnail sidebar
+- `F`: toggle folder tree
 
 The app also handles the same physical keys across keyboard layouts, including Korean input layouts.
 
@@ -96,6 +99,6 @@ The app also handles the same physical keys across keyboard layouts, including K
 
 # Notes
 
-- The app currently scans only the selected folder, not subfolders.
+- Each folder is culled on its own. Clicking a folder loads only the files directly inside it, not its subfolders.
 - The move step is destructive in the sense that files are relocated, not copied.
 - The `.build/` directory is local-only and is ignored by Git.
