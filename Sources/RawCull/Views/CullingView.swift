@@ -23,12 +23,16 @@ struct CullingView: View {
             // Main content
             VStack(spacing: 0) {
                 // Photo
-                PhotoView(
-                    image: currentPreview,
-                    decision: session.currentItem?.decision ?? .undecided,
-                    isZoomed: $isZoomed,
-                    rotationQuarterTurns: rotationQuarterTurns
-                )
+                if session.count == 0 {
+                    EmptyFolderView()
+                } else {
+                    PhotoView(
+                        image: currentPreview,
+                        decision: session.currentItem?.decision ?? .undecided,
+                        isZoomed: $isZoomed,
+                        rotationQuarterTurns: rotationQuarterTurns
+                    )
+                }
 
                 Divider()
 
@@ -56,6 +60,7 @@ struct CullingView: View {
                     onFinish()
                 }
                 .keyboardShortcut(.return, modifiers: .command)
+                .disabled(session.count == 0)
             }
         }
         .onChange(of: session.currentIndex) { _, newIndex in
@@ -173,6 +178,20 @@ struct CullingView: View {
             return true
         default:
             return false
+        }
+    }
+}
+
+private struct EmptyFolderView: View {
+    var body: some View {
+        ZStack {
+            Color.black
+            ContentUnavailableView(
+                "No photos in this folder",
+                systemImage: "photo",
+                description: Text("Pick another folder from the tree on the left.")
+            )
+            .foregroundStyle(.white)
         }
     }
 }

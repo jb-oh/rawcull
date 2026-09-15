@@ -14,7 +14,7 @@ struct StatusBar: View {
                 Image(systemName: "chevron.left")
                     .foregroundStyle(.tertiary)
                     .font(.caption)
-                Text("\(currentIndex + 1) / \(totalCount)")
+                Text(totalCount == 0 ? "0 / 0" : "\(currentIndex + 1) / \(totalCount)")
                     .monospacedDigit()
                     .fontWeight(.medium)
                 Image(systemName: "chevron.right")
