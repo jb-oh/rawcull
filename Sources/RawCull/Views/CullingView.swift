@@ -148,8 +148,9 @@ struct CullingView: View {
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else {
             return false
         }
-        // Keys would act on the previous folder until the switch lands.
-        guard loading == nil else { return false }
+        // Keys would act on the previous folder until the switch lands. Swallow
+        // them so an unhandled key does not beep.
+        guard loading == nil else { return true }
 
         switch event.keyCode {
         case 123, 126:
