@@ -9,6 +9,9 @@ struct CullingView: View {
     let onFinish: () -> Void
     let onCloseFolder: () -> Void
     @Binding var expandedFolderURLs: Set<URL>
+    /// Non-nil while a folder switch is in flight. Culling keys and Finish are
+    /// blocked for the whole switch; the overlay itself appears after a delay.
+    let loading: FolderLoading?
 
     @State private var isZoomed = false
     @State private var rotationQuarterTurns = 0
@@ -30,38 +33,46 @@ struct CullingView: View {
                 Divider()
             }
 
-            // Thumbnail sidebar
-            if showSidebar {
-                ThumbnailSidebar()
-                    .frame(width: 120)
+            HStack(spacing: 0) {
+                // Thumbnail sidebar
+                if showSidebar {
+                    ThumbnailSidebar()
+                        .frame(width: 120)
 
-                Divider()
-            }
-
-            // Main content
-            VStack(spacing: 0) {
-                // Photo
-                if session.count == 0 {
-                    EmptyFolderView()
-                } else {
-                    PhotoView(
-                        image: currentPreview,
-                        decision: session.currentItem?.decision ?? .undecided,
-                        isZoomed: $isZoomed,
-                        rotationQuarterTurns: rotationQuarterTurns
-                    )
+                    Divider()
                 }
 
-                Divider()
+                // Main content
+                VStack(spacing: 0) {
+                    // Photo
+                    if session.count == 0 {
+                        EmptyFolderView()
+                    } else {
+                        PhotoView(
+                            image: currentPreview,
+                            decision: session.currentItem?.decision ?? .undecided,
+                            isZoomed: $isZoomed,
+                            rotationQuarterTurns: rotationQuarterTurns
+                        )
+                    }
 
-                // Status bar
-                StatusBar(
-                    currentIndex: session.currentIndex,
-                    totalCount: session.count,
-                    decision: session.currentItem?.decision ?? .undecided,
-                    pickCount: session.pickCount,
-                    rejectCount: session.rejectCount
-                )
+                    Divider()
+
+                    // Status bar
+                    StatusBar(
+                        currentIndex: session.currentIndex,
+                        totalCount: session.count,
+                        decision: session.currentItem?.decision ?? .undecided,
+                        pickCount: session.pickCount,
+                        rejectCount: session.rejectCount
+                    )
+                }
+            }
+            // Leaves the folder tree clickable so another folder can be picked.
+            .overlay {
+                if let loading, loading.showsOverlay {
+                    FolderLoadingOverlay(folderName: loading.folderName, foundCount: loading.foundCount)
+                }
             }
         }
         .background {
@@ -83,7 +94,7 @@ struct CullingView: View {
                     onFinish()
                 }
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(session.count == 0)
+                .disabled(session.count == 0 || loading != nil)
             }
         }
         .onChange(of: session.currentIndex) { _, newIndex in
@@ -137,6 +148,8 @@ struct CullingView: View {
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else {
             return false
         }
+        // Keys would act on the previous folder until the switch lands.
+        guard loading == nil else { return false }
 
         switch event.keyCode {
         case 123, 126:

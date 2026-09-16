@@ -24,6 +24,7 @@
 		9DD7CCEF42382AB293F70F5E /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7546106BCFF6EB47F7C9FBC8 /* ImageLoader.swift */; };
 		B52FC074AD5F1B6D5BC3CA28 /* FolderNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCA6E52C45B229E7B425833 /* FolderNode.swift */; };
 		BF7C71DFA73FEC29BF159C24 /* PhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E1D2421DF6E228FF113A38 /* PhotoView.swift */; };
+		C4FF91F29A43501DA8FC75FC /* FolderLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FE33504CBF904422D96349 /* FolderLoadingOverlay.swift */; };
 		C8896FC2141949B852D7ECF8 /* FolderTreePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F92A6FA6BEB946E8BFE857 /* FolderTreePanel.swift */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +38,7 @@
 		7546106BCFF6EB47F7C9FBC8 /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
 		83E1D2421DF6E228FF113A38 /* PhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoView.swift; sourceTree = "<group>"; };
 		93852A5B370774FD683C8181 /* FavrenUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = FavrenUI; path = "../favren-works/brand/apple/FavrenUI"; sourceTree = SOURCE_ROOT; };
+		99FE33504CBF904422D96349 /* FolderLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderLoadingOverlay.swift; sourceTree = "<group>"; };
 		9B26AC669A9288305FDB7731 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9EB5FBC6640A74426B76967B /* RawCull.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RawCull.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A7B8B3FBABAD77A65A9659AE /* CullingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CullingView.swift; sourceTree = "<group>"; };
@@ -65,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				A7B8B3FBABAD77A65A9659AE /* CullingView.swift */,
+				99FE33504CBF904422D96349 /* FolderLoadingOverlay.swift */,
 				16F92A6FA6BEB946E8BFE857 /* FolderTreePanel.swift */,
 				83E1D2421DF6E228FF113A38 /* PhotoView.swift */,
 				3434E9228B87451778161D39 /* StatusBar.swift */,
@@ -226,6 +229,7 @@
 				6C8CA8403D7849D9A086D778 /* CullSession.swift in Sources */,
 				2442BEA766287291CF62FFDF /* CullingView.swift in Sources */,
 				3C098C8FE3608C4AF40961EB /* FileMover.swift in Sources */,
+				C4FF91F29A43501DA8FC75FC /* FolderLoadingOverlay.swift in Sources */,
 				B52FC074AD5F1B6D5BC3CA28 /* FolderNode.swift in Sources */,
 				2A3AA20CBDB9090FE50FD7DF /* FolderScanner.swift in Sources */,
 				C8896FC2141949B852D7ECF8 /* FolderTreePanel.swift in Sources */,

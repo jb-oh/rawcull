@@ -16,6 +16,11 @@ struct ContentView: View {
     @State private var folderTree: FolderNode?
     @State private var switchTask: Task<Void, Never>?
     @State private var pendingFolderURL: URL?
+    @State private var scannedCount = 0
+    @State private var showsLoadingOverlay = false
+    /// Bumped by every `loadFolder`, so progress hops and the overlay timer of
+    /// a superseded load (even one for the same URL) can tell they are stale.
+    @State private var loadGeneration = 0
     @State private var expandedFolderURLs: Set<URL> = []
     @State private var isContinuing = false
 
@@ -30,7 +35,8 @@ struct ContentView: View {
                     onSelectFolder: switchFolder,
                     onFinish: { appState = .done },
                     onCloseFolder: closeFolder,
-                    expandedFolderURLs: $expandedFolderURLs
+                    expandedFolderURLs: $expandedFolderURLs,
+                    loading: folderLoading
                 )
                 .environment(imageLoader)
             case .done:
@@ -47,6 +53,16 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             session.flushSave()
         }
+    }
+
+    /// Non-nil while a folder switch is in flight.
+    private var folderLoading: FolderLoading? {
+        guard let pendingFolderURL else { return nil }
+        return FolderLoading(
+            folderName: pendingFolderURL.lastPathComponent,
+            foundCount: scannedCount,
+            showsOverlay: showsLoadingOverlay
+        )
     }
 
     // MARK: - Flow
@@ -72,9 +88,26 @@ struct ContentView: View {
     private func loadFolder(_ url: URL, onLoaded: (() -> Void)? = nil) {
         switchTask?.cancel()
         pendingFolderURL = url
+        scannedCount = 0
+        loadGeneration += 1
+        let generation = loadGeneration
+
+        // Show the overlay only if the load is still pending after a short
+        // delay. A superseding load keeps an already visible overlay up.
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard loadGeneration == generation, pendingFolderURL != nil else { return }
+            showsLoadingOverlay = true
+        }
+
         switchTask = Task {
             let scanTask = Task.detached(priority: .userInitiated) {
-                FolderScanner.scan(folderURL: url)
+                FolderScanner.scan(folderURL: url) { count in
+                    Task { @MainActor in
+                        guard loadGeneration == generation, pendingFolderURL != nil else { return }
+                        scannedCount = count
+                    }
+                }
             }
             // A detached task does not inherit cancellation, so forward it.
             let fileURLs = await withTaskCancellationHandler {
@@ -89,6 +122,7 @@ struct ContentView: View {
             imageLoader.startLoading(items: session.items, currentIndex: session.currentIndex)
             if pendingFolderURL?.path == url.path {
                 pendingFolderURL = nil
+                showsLoadingOverlay = false
             }
             onLoaded?()
         }
@@ -117,6 +151,8 @@ struct ContentView: View {
         switchTask?.cancel()
         switchTask = nil
         pendingFolderURL = nil
+        showsLoadingOverlay = false
+        scannedCount = 0
         session.flushSave()
         session.reset()
         imageLoader.clearAll()
