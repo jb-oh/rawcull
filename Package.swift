@@ -6,9 +6,13 @@ let package = Package(
     platforms: [
         .macOS(.v14)
     ],
+    dependencies: [
+        .package(path: "../favren-works/brand/apple/FavrenUI")
+    ],
     targets: [
         .executableTarget(
-            name: "RawCull"
+            name: "RawCull",
+            dependencies: ["FavrenUI"]
         ),
         .testTarget(
             name: "RawCullTests",
