@@ -1,3 +1,4 @@
+import FavrenUI
 import SwiftUI
 
 struct ThumbnailSidebar: View {
@@ -72,7 +73,7 @@ struct ThumbnailCell: View {
             // Decision dot
             if decision != .undecided {
                 Circle()
-                    .fill(decision == .pick ? .green : .red)
+                    .fill(decision == .pick ? FavrenSemantic.success : FavrenSemantic.danger)
                     .frame(width: 10, height: 10)
                     .padding(4)
             }
@@ -80,7 +81,7 @@ struct ThumbnailCell: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay {
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(isCurrent ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(isCurrent ? FavrenColors.primary : Color.clear, lineWidth: 2)
         }
         .opacity(decision == .reject ? 0.5 : 1.0)
     }

@@ -1,4 +1,5 @@
 import AppKit
+import FavrenUI
 import SwiftUI
 
 struct PhotoView: View {
@@ -59,7 +60,7 @@ struct PhotoView: View {
         .onChange(of: decision) { oldValue, newValue in
             guard newValue != .undecided else { return }
             withAnimation(.easeOut(duration: 0.3)) {
-                flashColor = newValue == .pick ? .green : .red
+                flashColor = newValue == .pick ? FavrenSemantic.success : FavrenSemantic.danger
             }
             withAnimation(.easeOut(duration: 0.3).delay(0.3)) {
                 flashColor = nil

@@ -1,3 +1,4 @@
+import FavrenUI
 import SwiftUI
 
 struct StatusBar: View {
@@ -26,23 +27,16 @@ struct StatusBar: View {
                 .frame(height: 16)
 
             // Decision badge
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(decisionColor)
-                    .frame(width: 8, height: 8)
-                Text(decisionLabel)
-                    .font(.callout)
-                    .foregroundStyle(decisionColor)
-            }
+            FavrenBadge(decisionLabel, tone: decisionTone)
 
             Spacer()
 
             // Counts
             HStack(spacing: 12) {
                 Label("\(pickCount)", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(FavrenSemantic.success)
                 Label("\(rejectCount)", systemImage: "xmark.circle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(FavrenSemantic.danger)
             }
             .font(.callout)
             .monospacedDigit()
@@ -51,20 +45,33 @@ struct StatusBar: View {
                 .frame(height: 16)
 
             // Keyboard hints
-            Text("A accept  S unmark  D reject  Z/X/C view  Space zoom")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                FavrenKeyCap("A")
+                Text("accept")
+                FavrenKeyCap("S")
+                Text("unmark")
+                FavrenKeyCap("D")
+                Text("reject")
+                FavrenKeyCap("Z")
+                FavrenKeyCap("X")
+                FavrenKeyCap("C")
+                Text("view")
+                FavrenKeyCap("Space")
+                Text("zoom")
+            }
+            .font(.caption)
+            .foregroundStyle(FavrenColors.onSurfaceVariant)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.bar)
     }
 
-    private var decisionColor: Color {
+    private var decisionTone: FavrenBadge.Tone {
         switch decision {
-        case .undecided: return .secondary
-        case .pick: return .green
-        case .reject: return .red
+        case .undecided: return .neutral
+        case .pick: return .success
+        case .reject: return .danger
         }
     }
 

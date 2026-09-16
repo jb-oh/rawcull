@@ -1,3 +1,4 @@
+import FavrenUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,24 +16,19 @@ struct WelcomeView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "photo.stack")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-
-            Text("RawCull")
-                .font(.largeTitle.bold())
-
-            Text("Drop a folder of photos to start culling")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-
-            Button("Open Folder...") {
-                openFolder()
+            FavrenEmptyState(
+                systemImage: "photo.stack",
+                title: "Open a folder to start culling",
+                subtitle: "Drop a folder here or press Command O"
+            ) {
+                Button("Open Folder...") {
+                    openFolder()
+                }
+                .buttonStyle(.favrenPrimary)
+                .frame(maxWidth: 220)
+                .keyboardShortcut("o", modifiers: .command)
+                .disabled(isProcessingFolder)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .keyboardShortcut("o", modifiers: .command)
-            .disabled(isProcessingFolder)
 
             if isProcessingFolder {
                 ProgressView("Scanning folder...")
@@ -45,7 +41,7 @@ struct WelcomeView: View {
         .background {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
-                    isDragOver ? Color.accentColor : Color.clear,
+                    isDragOver ? FavrenColors.primary : Color.clear,
                     style: StrokeStyle(lineWidth: 3, dash: [8])
                 )
                 .padding(16)

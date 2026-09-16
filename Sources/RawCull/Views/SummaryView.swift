@@ -1,3 +1,4 @@
+import FavrenUI
 import SwiftUI
 
 struct SummaryView: View {
@@ -20,7 +21,7 @@ struct SummaryView: View {
 
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 48))
-                .foregroundStyle(moveComplete ? .green : .secondary)
+                .foregroundStyle(moveComplete ? FavrenSemantic.success : .secondary)
 
             Text(moveComplete ? "Done!" : "Culling Summary")
                 .font(.largeTitle.bold())
@@ -33,8 +34,8 @@ struct SummaryView: View {
                 Button("Continue") {
                     onComplete()
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.favrenPrimary)
+                .frame(maxWidth: 200)
                 .disabled(isContinuing)
 
                 if isContinuing {
@@ -43,39 +44,39 @@ struct SummaryView: View {
                 }
             } else {
                 // Stats
-                VStack(spacing: 12) {
-                    SummaryRow(label: "Picks", count: session.pickCount, color: .green, icon: "checkmark.circle.fill")
-                    SummaryRow(label: "Rejects", count: session.rejectCount, color: .red, icon: "xmark.circle.fill")
-                    SummaryRow(label: "Undecided", count: session.undecidedCount, color: .secondary, icon: "questionmark.circle")
+                FavrenSurface {
+                    VStack(spacing: 12) {
+                        SummaryRow(label: "Picks", count: session.pickCount, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
+                        SummaryRow(label: "Rejects", count: session.rejectCount, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
+                        SummaryRow(label: "Undecided", count: session.undecidedCount, color: FavrenSemantic.neutral, icon: "questionmark.circle")
+                    }
                 }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary))
 
                 if session.undecidedCount > 0 {
                     Label(
                         "\(session.undecidedCount) photos are undecided. They will stay in place.",
                         systemImage: "exclamationmark.triangle"
                     )
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(FavrenSemantic.warning)
                     .font(.callout)
                 }
 
                 if let rootURL {
-                    VStack(spacing: 8) {
-                        Text("All folders under \(rootURL.lastPathComponent)")
-                            .font(.headline)
-                        if let totals {
-                            SummaryRow(label: "Folders with sessions", count: totals.folders, color: .secondary, icon: "folder")
-                            SummaryRow(label: "Picks", count: totals.picks, color: .green, icon: "checkmark.circle.fill")
-                            SummaryRow(label: "Rejects", count: totals.rejects, color: .red, icon: "xmark.circle.fill")
-                            SummaryRow(label: "Undecided", count: totals.undecided, color: .secondary, icon: "questionmark.circle")
-                        } else {
-                            ProgressView("Counting folders...")
-                                .controlSize(.small)
+                    FavrenSurface {
+                        VStack(spacing: 8) {
+                            Text("All folders under \(rootURL.lastPathComponent)")
+                                .font(.headline)
+                            if let totals {
+                                SummaryRow(label: "Folders with sessions", count: totals.folders, color: FavrenSemantic.neutral, icon: "folder")
+                                SummaryRow(label: "Picks", count: totals.picks, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
+                                SummaryRow(label: "Rejects", count: totals.rejects, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
+                                SummaryRow(label: "Undecided", count: totals.undecided, color: FavrenSemantic.neutral, icon: "questionmark.circle")
+                            } else {
+                                ProgressView("Counting folders...")
+                                    .controlSize(.small)
+                            }
                         }
                     }
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary))
                 }
 
                 if isMoving {
@@ -88,20 +89,22 @@ struct SummaryView: View {
                         Button("Go Back") {
                             onGoBack()
                         }
-                        .controlSize(.large)
+                        .buttonStyle(.favrenSecondary)
+                        .frame(maxWidth: 200)
 
                         Button("Move Files") {
                             moveFiles()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(.favrenPrimary)
+                        .frame(maxWidth: 200)
                         .disabled(session.pickCount + session.rejectCount == 0)
 
                         if rootURL != nil {
                             Button("Move All Folders") {
                                 moveAllFolders()
                             }
-                            .controlSize(.large)
+                            .buttonStyle(.favrenSecondary)
+                            .frame(maxWidth: 200)
                             .disabled((totals?.picks ?? 0) + (totals?.rejects ?? 0) == 0)
                         }
                     }
@@ -109,7 +112,7 @@ struct SummaryView: View {
 
                 if let error = moveError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(FavrenSemantic.danger)
                         .font(.callout)
                 }
             }

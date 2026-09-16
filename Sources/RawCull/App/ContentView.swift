@@ -1,4 +1,5 @@
 import AppKit
+import FavrenUI
 import SwiftUI
 
 enum AppState {
@@ -42,6 +43,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 600)
+        .favrenWindowBackground()
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             session.flushSave()
         }
