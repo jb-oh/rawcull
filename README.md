@@ -48,11 +48,16 @@ xcodebuild -project RawCull.xcodeproj -scheme RawCull -configuration Debug build
 `project.yml` is the source of truth; `RawCull.xcodeproj` is committed so the project can be
 opened without running XcodeGen first, but regenerate it after changing `project.yml`.
 
-The package can still be built and run directly with SwiftPM, without an app bundle or icon:
+The FavrenUI package is resolved at `../favren-works/brand/apple/FavrenUI`, so the
+`favren-works` repo must be cloned next to this one.
+
+The SwiftPM target is kept for `swift build` and `swift test` only, not for running the app.
+Running RawCull as a plain SwiftPM executable has no Info.plist and no activation policy, so it
+launches without a Dock icon or menu bar and its window will not come forward. Use the Xcode
+project (bundle) to run the app.
 
 ```bash
 swift build
-swift run
 ```
 
 # Test

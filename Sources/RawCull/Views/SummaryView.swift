@@ -21,7 +21,7 @@ struct SummaryView: View {
 
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 48))
-                .foregroundStyle(moveComplete ? FavrenSemantic.success : .secondary)
+                .foregroundStyle(moveComplete ? FavrenSemantic.success : FavrenColors.onSurfaceVariant)
 
             Text(moveComplete ? "Done!" : "Culling Summary")
                 .font(.largeTitle.bold())

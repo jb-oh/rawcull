@@ -13,9 +13,10 @@ targets:
     platform: macOS
     sources:
       - path: Sources/RawCull
-      # type: folder.iconcomposer.icon so actool builds Assets.car + AppIcon.icns from the .icon folder.
-      # If a future `xcodegen generate` writes lastKnownFileType as plain "folder" in RawCull.xcodeproj,
-      # hand-fix that reference back to folder.iconcomposer.icon.
+      # type: folder.iconcomposer.icon makes XcodeGen emit lastKnownFileType = wrapper.icon in
+      # RawCull.xcodeproj/project.pbxproj, which actool accepts to build Assets.car + AppIcon.icns
+      # from the .icon folder. If a future `xcodegen generate` writes plain "folder" instead, the
+      # icon will not compile; fix the reference back to wrapper.icon.
       - path: AppIcon.icon
         buildPhase: resources
         type: folder.iconcomposer.icon
