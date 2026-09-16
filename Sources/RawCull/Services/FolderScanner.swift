@@ -25,8 +25,18 @@ struct FolderScanner {
         }
     }
 
+    /// How many supported files are found between progress reports.
+    static let progressInterval = 100
+
     /// Scans a folder for supported image files, sorted by filename.
-    static func scan(folderURL: URL) -> [URL] {
+    ///
+    /// `onProgress` receives the running count of supported files every
+    /// `progressInterval` files, then once more with the final count. It is
+    /// called on whatever thread the scan runs on.
+    ///
+    /// The scan checks `Task.isCancelled` as it goes. A cancelled scan stops
+    /// early, returns an empty array and skips the final progress report.
+    static func scan(folderURL: URL, onProgress: ((Int) -> Void)? = nil) -> [URL] {
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: folderURL,
@@ -38,10 +48,17 @@ struct FolderScanner {
 
         var urls: [URL] = []
         for case let fileURL as URL in enumerator {
+            if Task.isCancelled {
+                return []
+            }
             if isSupported(fileURL) {
                 urls.append(fileURL)
+                if urls.count % progressInterval == 0 {
+                    onProgress?(urls.count)
+                }
             }
         }
+        onProgress?(urls.count)
 
         // Natural sort by filename (IMG_0001 < IMG_0002 < IMG_0010)
         urls.sort { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }

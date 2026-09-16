@@ -28,6 +28,46 @@ struct FolderScannerTests {
         #expect(names == ["a.png", "b.webp", "c.pef", "d.JPG"])
     }
 
+    @Test func scanReportsProgressEveryIntervalAndAtTheEnd() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        for index in 0..<250 {
+            fileManager.createFile(atPath: tempDir.appendingPathComponent("\(index).png").path, contents: Data())
+        }
+
+        var counts: [Int] = []
+        let result = FolderScanner.scan(folderURL: tempDir) { counts.append($0) }
+
+        #expect(result.count == 250)
+        #expect(counts == counts.sorted())
+        #expect(Set(counts).count == counts.count)
+        #expect(counts.contains(100))
+        #expect(counts.contains(200))
+        #expect(counts.last == result.count)
+    }
+
+    @Test func scanReturnsEmptyWhenTaskIsCancelled() async throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        for index in 0..<5 {
+            fileManager.createFile(atPath: tempDir.appendingPathComponent("\(index).png").path, contents: Data())
+        }
+
+        let result = await Task.detached {
+            // Cancel before scanning so the result does not depend on timing.
+            withUnsafeCurrentTask { $0?.cancel() }
+            return FolderScanner.scan(folderURL: tempDir)
+        }.value
+
+        #expect(result.isEmpty)
+    }
+
     @Test(arguments: ["png", "gif", "heic", "webp", "arw", "pef", "srw"])
     func isSupportedTrueForImageExtensions(ext: String) throws {
         let url = URL(fileURLWithPath: "/tmp/test-file.\(ext)")

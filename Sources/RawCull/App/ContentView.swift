@@ -73,9 +73,15 @@ struct ContentView: View {
         switchTask?.cancel()
         pendingFolderURL = url
         switchTask = Task {
-            let fileURLs = await Task.detached(priority: .userInitiated) {
+            let scanTask = Task.detached(priority: .userInitiated) {
                 FolderScanner.scan(folderURL: url)
-            }.value
+            }
+            // A detached task does not inherit cancellation, so forward it.
+            let fileURLs = await withTaskCancellationHandler {
+                await scanTask.value
+            } onCancel: {
+                scanTask.cancel()
+            }
             guard !Task.isCancelled else { return }
 
             imageLoader.clearAll()
