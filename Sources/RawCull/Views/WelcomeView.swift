@@ -18,8 +18,8 @@ struct WelcomeView: View {
 
             FavrenEmptyState(
                 systemImage: "photo.stack",
-                title: "Open a folder to start culling",
-                subtitle: "Drop a folder here or press Command O"
+                title: String(localized: "Open a folder to start culling", bundle: Localization.bundle),
+                subtitle: String(localized: "Drop a folder here or press Command O", bundle: Localization.bundle)
             ) {
                 Button("Open Folder...") {
                     openFolder()
@@ -80,7 +80,7 @@ struct WelcomeView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Select a folder containing photos"
+        panel.message = String(localized: "Select a folder containing photos", bundle: Localization.bundle)
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         processFolder(url)

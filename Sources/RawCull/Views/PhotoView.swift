@@ -87,10 +87,13 @@ private struct CenteredZoomImageView: NSViewRepresentable {
 private final class CenteredZoomScrollView: NSScrollView {
     private let containerView = NSView()
     private let imageView = NSImageView()
+    private let minimapView = ZoomMinimapView()
     private var currentImage: NSImage?
     private var rotationQuarterTurns = 0
     private var shouldCenterOnNextLayout = true
-    private let zoomScale: CGFloat = 2.0
+    private var geometry: ZoomGeometry?
+    private var photoCenter = CGPoint(x: 0.5, y: 0.5)
+    private var isLayingOut = false
 
     init() {
         super.init(frame: .zero)
@@ -109,6 +112,18 @@ private final class CenteredZoomScrollView: NSScrollView {
         imageView.frame = .zero
         containerView.addSubview(imageView)
         documentView = containerView
+
+        addSubview(minimapView)
+        minimapView.panToPoint = { [weak self] point in
+            self?.scrollToPhotoPoint(point)
+        }
+        contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(clipBoundsDidChange),
+            name: NSView.boundsDidChangeNotification,
+            object: contentView
+        )
     }
 
     @available(*, unavailable)
@@ -135,6 +150,9 @@ private final class CenteredZoomScrollView: NSScrollView {
     }
 
     override func layout() {
+        guard !isLayingOut else { return }
+        isLayingOut = true
+        defer { isLayingOut = false }
         super.layout()
 
         guard let image = currentImage else { return }
@@ -145,19 +163,20 @@ private final class CenteredZoomScrollView: NSScrollView {
         let imageSize = image.size
         guard imageSize.width > 0, imageSize.height > 0 else { return }
 
-        let fittedSize = fittedDisplaySize(
-            for: imageSize,
-            in: viewportSize,
+        let newGeometry = ZoomGeometry(
+            imageSize: imageSize,
+            viewportSize: viewportSize,
             rotationQuarterTurns: rotationQuarterTurns
         )
-        let documentSize = NSSize(
-            width: fittedSize.width * zoomScale,
-            height: fittedSize.height * zoomScale
-        )
+        let documentSize = newGeometry.documentSize
         let imageFrameSize = imageFrameSize(
-            for: documentSize,
+            for: newGeometry.photoRect.size,
             rotationQuarterTurns: rotationQuarterTurns
         )
+        let shouldReposition = shouldCenterOnNextLayout || geometry != newGeometry
+        geometry = newGeometry
+        horizontalScrollElasticity = documentSize.width > viewportSize.width ? .automatic : .none
+        verticalScrollElasticity = documentSize.height > viewportSize.height ? .automatic : .none
 
         if containerView.frame.size != documentSize {
             containerView.frame = NSRect(origin: .zero, size: documentSize)
@@ -178,22 +197,217 @@ private final class CenteredZoomScrollView: NSScrollView {
         imageView.layer?.setAffineTransform(CGAffineTransform(rotationAngle: CGFloat(rotationQuarterTurns) * (.pi / 2)))
 
         if shouldCenterOnNextLayout {
-            centerOnImageMidpoint()
+            photoCenter = CGPoint(x: 0.5, y: 0.5)
             shouldCenterOnNextLayout = false
         }
+        if shouldReposition {
+            scrollToPhotoPoint(photoCenter)
+        }
+        updateMinimap()
     }
 
-    private func centerOnImageMidpoint() {
-        let documentSize = containerView.frame.size
-        let viewportSize = contentView.bounds.size
-
-        let origin = NSPoint(
-            x: max(0, (documentSize.width - viewportSize.width) / 2),
-            y: max(0, (documentSize.height - viewportSize.height) / 2)
-        )
-
-        contentView.scroll(to: origin)
+    private func scrollToPhotoPoint(_ point: CGPoint) {
+        guard let geometry else { return }
+        photoCenter = point
+        contentView.scroll(to: geometry.scrollOrigin(centering: point))
         reflectScrolledClipView(contentView)
+        // Autohiding legacy scrollers can change the viewport again while reflecting.
+        guard contentView.bounds.size == geometry.viewportSize else {
+            needsLayout = true
+            return
+        }
+        photoCenter = geometry.photoPoint(at: contentView.bounds.center)
+        updateMinimap()
+    }
+
+    @objc private func clipBoundsDidChange(_ notification: Notification) {
+        guard !isLayingOut, let geometry else { return }
+        // Resizing can constrain the old clip origin before layout has updated the photo.
+        // Keep the last scroll position until the new geometry is ready.
+        guard contentView.bounds.size == geometry.viewportSize else {
+            needsLayout = true
+            return
+        }
+        photoCenter = geometry.photoPoint(at: contentView.bounds.center)
+        updateMinimap()
+    }
+
+    private func updateMinimap() {
+        guard let geometry, contentView.bounds.size == geometry.viewportSize else { return }
+        let viewport = contentView.bounds
+        minimapView.isHidden = viewport.contains(geometry.photoRect)
+        guard !minimapView.isHidden else { return }
+
+        let viewportFrame = convert(contentView.bounds, from: contentView)
+        let inset: CGFloat = 12
+        let availableWidth = max(0, viewportFrame.width - inset * 2)
+        let availableHeight = max(0, viewportFrame.height - inset * 2)
+        let longestSide = min(160, availableWidth, availableHeight)
+        let size = geometry.photoRect.size
+        let scale = longestSide / max(size.width, size.height)
+        let minimapSize = CGSize(width: size.width * scale, height: size.height * scale)
+        minimapView.frame = CGRect(
+            x: viewportFrame.maxX - inset - minimapSize.width,
+            y: isFlipped ? viewportFrame.minY + inset : viewportFrame.maxY - inset - minimapSize.height,
+            width: minimapSize.width,
+            height: minimapSize.height
+        )
+        minimapView.image = currentImage
+        minimapView.rotationQuarterTurns = rotationQuarterTurns
+        minimapView.visiblePhotoRect = geometry.minimapVisibleRect(
+            viewportBounds: viewport,
+            minimapBounds: minimapView.bounds
+        )
+        minimapView.needsDisplay = true
+    }
+}
+
+/// Geometry uses the displayed, rotated photo and AppKit's upward-growing y axis.
+struct ZoomGeometry: Equatable {
+    let viewportSize: CGSize
+    let documentSize: CGSize
+    let photoRect: CGRect
+
+    init(imageSize: CGSize, viewportSize: CGSize, rotationQuarterTurns: Int) {
+        self.viewportSize = viewportSize
+        let fittedSize = fittedDisplaySize(
+            for: imageSize, in: viewportSize, rotationQuarterTurns: rotationQuarterTurns
+        )
+        let displayedSize = CGSize(width: fittedSize.width * 2, height: fittedSize.height * 2)
+        documentSize = CGSize(
+            width: max(displayedSize.width, viewportSize.width),
+            height: max(displayedSize.height, viewportSize.height)
+        )
+        photoRect = CGRect(
+            x: (documentSize.width - displayedSize.width) / 2,
+            y: (documentSize.height - displayedSize.height) / 2,
+            width: displayedSize.width,
+            height: displayedSize.height
+        )
+    }
+
+    func photoPoint(at documentPoint: CGPoint) -> CGPoint {
+        Self.unitPoint(at: documentPoint, in: photoRect)
+    }
+
+    func scrollOrigin(centering point: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(0, photoRect.minX + point.x * photoRect.width - viewportSize.width / 2),
+                   documentSize.width - viewportSize.width),
+            y: min(max(0, photoRect.minY + point.y * photoRect.height - viewportSize.height / 2),
+                   documentSize.height - viewportSize.height)
+        )
+    }
+
+    func minimapVisibleRect(viewportBounds: CGRect, minimapBounds: CGRect) -> CGRect {
+        let visible = photoRect.intersection(viewportBounds)
+        guard !visible.isNull else { return .zero }
+        return CGRect(
+            x: minimapBounds.minX + (visible.minX - photoRect.minX) / photoRect.width * minimapBounds.width,
+            y: minimapBounds.minY + (visible.minY - photoRect.minY) / photoRect.height * minimapBounds.height,
+            width: visible.width / photoRect.width * minimapBounds.width,
+            height: visible.height / photoRect.height * minimapBounds.height
+        )
+    }
+
+    static func unitPoint(at point: CGPoint, in rect: CGRect) -> CGPoint {
+        guard rect.width > 0, rect.height > 0 else { return CGPoint(x: 0.5, y: 0.5) }
+        return CGPoint(
+            x: min(1, max(0, (point.x - rect.minX) / rect.width)),
+            y: min(1, max(0, (point.y - rect.minY) / rect.height))
+        )
+    }
+}
+
+private extension CGRect {
+    var center: CGPoint { CGPoint(x: midX, y: midY) }
+}
+
+private final class ZoomMinimapView: NSView {
+    var image: NSImage? {
+        didSet {
+            guard image !== oldValue else { return }
+            cachedBitmap = image.flatMap { Self.makeBitmap(for: $0) }
+            needsDisplay = true
+        }
+    }
+    private var cachedBitmap: NSBitmapImageRep?
+    var rotationQuarterTurns = 0
+    var visiblePhotoRect = CGRect.zero
+    var panToPoint: ((CGPoint) -> Void)?
+
+    override var acceptsFirstResponder: Bool { false }
+
+    private static func makeBitmap(for image: NSImage) -> NSBitmapImageRep? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        // A 320 px bitmap covers the minimap's maximum 160 pt size on Retina.
+        let scale = 320 / max(size.width, size.height)
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: max(1, Int((size.width * scale).rounded())),
+            pixelsHigh: max(1, Int((size.height * scale).rounded())),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        image.draw(in: CGRect(x: 0, y: 0, width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
+        return bitmap
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let cachedBitmap, bounds.width > 0, bounds.height > 0 else { return }
+
+        let outline = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+        NSGraphicsContext.saveGraphicsState()
+        outline.addClip()
+        NSColor(FavrenColors.brand.graphite).withAlphaComponent(0.75).setFill()
+        bounds.fill()
+
+        NSGraphicsContext.saveGraphicsState()
+        let transform = NSAffineTransform()
+        transform.translateX(by: bounds.midX, yBy: bounds.midY)
+        transform.rotate(byDegrees: CGFloat(rotationQuarterTurns) * 90)
+        transform.concat()
+        let size = imageFrameSize(for: bounds.size, rotationQuarterTurns: rotationQuarterTurns)
+        cachedBitmap.draw(in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor(FavrenColors.brand.graphite).withAlphaComponent(0.2).setFill()
+        let shade = NSBezierPath(rect: bounds)
+        shade.appendRect(visiblePhotoRect)
+        shade.windingRule = .evenOdd
+        shade.fill()
+        NSColor.white.setStroke()
+        let visible = NSBezierPath(rect: visiblePhotoRect.insetBy(dx: 1, dy: 1))
+        visible.lineWidth = 2
+        visible.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor(FavrenColors.outline).withAlphaComponent(0.8).setStroke()
+        outline.lineWidth = 1
+        outline.stroke()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        pan(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        pan(with: event)
+    }
+
+    private func pan(with event: NSEvent) {
+        panToPoint?(ZoomGeometry.unitPoint(at: convert(event.locationInWindow, from: nil), in: bounds))
     }
 }
 

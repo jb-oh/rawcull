@@ -23,7 +23,7 @@ struct SummaryView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(moveComplete ? FavrenSemantic.success : FavrenColors.onSurfaceVariant)
 
-            Text(moveComplete ? "Done!" : "Culling Summary")
+            Text(moveComplete ? String(localized: "Done!", bundle: Localization.bundle) : String(localized: "Culling Summary", bundle: Localization.bundle))
                 .font(.largeTitle.bold())
 
             if moveComplete {
@@ -46,15 +46,15 @@ struct SummaryView: View {
                 // Stats
                 FavrenSurface {
                     VStack(spacing: 12) {
-                        SummaryRow(label: "Picks", count: session.pickCount, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
-                        SummaryRow(label: "Rejects", count: session.rejectCount, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
-                        SummaryRow(label: "Undecided", count: session.undecidedCount, color: FavrenSemantic.neutral, icon: "questionmark.circle")
+                        SummaryRow(label: String(localized: "Picks", bundle: Localization.bundle), count: session.pickCount, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
+                        SummaryRow(label: String(localized: "Rejects", bundle: Localization.bundle), count: session.rejectCount, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
+                        SummaryRow(label: String(localized: "Undecided", bundle: Localization.bundle), count: session.undecidedCount, color: FavrenSemantic.neutral, icon: "questionmark.circle")
                     }
                 }
 
                 if session.undecidedCount > 0 {
                     Label(
-                        "\(session.undecidedCount) photos are undecided. They will stay in place.",
+                        Self.undecidedMessage(count: session.undecidedCount, folderURL: session.folderURL),
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(FavrenSemantic.warning)
@@ -67,10 +67,10 @@ struct SummaryView: View {
                             Text("All folders under \(rootURL.lastPathComponent)")
                                 .font(.headline)
                             if let totals {
-                                SummaryRow(label: "Folders with sessions", count: totals.folders, color: FavrenSemantic.neutral, icon: "folder")
-                                SummaryRow(label: "Picks", count: totals.picks, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
-                                SummaryRow(label: "Rejects", count: totals.rejects, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
-                                SummaryRow(label: "Undecided", count: totals.undecided, color: FavrenSemantic.neutral, icon: "questionmark.circle")
+                                SummaryRow(label: String(localized: "Folders with sessions", bundle: Localization.bundle), count: totals.folders, color: FavrenSemantic.neutral, icon: "folder")
+                                SummaryRow(label: String(localized: "Picks", bundle: Localization.bundle), count: totals.picks, color: FavrenSemantic.success, icon: "checkmark.circle.fill")
+                                SummaryRow(label: String(localized: "Rejects", bundle: Localization.bundle), count: totals.rejects, color: FavrenSemantic.danger, icon: "xmark.circle.fill")
+                                SummaryRow(label: String(localized: "Undecided", bundle: Localization.bundle), count: totals.undecided, color: FavrenSemantic.neutral, icon: "questionmark.circle")
                             } else {
                                 ProgressView("Counting folders...")
                                     .controlSize(.small)
@@ -97,7 +97,9 @@ struct SummaryView: View {
                         }
                         .buttonStyle(.favrenPrimary)
                         .frame(maxWidth: 200)
-                        .disabled(session.pickCount + session.rejectCount == 0)
+                        .disabled(session.folderURL.map {
+                            FileMover.moveCount(items: session.items, folderURL: $0) == 0
+                        } ?? true)
 
                         if rootURL != nil {
                             Button("Move All Folders") {
@@ -105,7 +107,7 @@ struct SummaryView: View {
                             }
                             .buttonStyle(.favrenSecondary)
                             .frame(maxWidth: 200)
-                            .disabled((totals?.picks ?? 0) + (totals?.rejects ?? 0) == 0)
+                            .disabled((totals?.filesToMove ?? 0) == 0)
                         }
                     }
                 }
@@ -157,7 +159,7 @@ struct SummaryView: View {
                 session.deleteSessionFile()
                 isMoving = false
                 moveComplete = true
-                resultMessage = "\(result.picks) picks moved to Picks/, \(result.rejects) rejects moved to Rejects/"
+                resultMessage = Self.moveResultMessage(result, folderURL: folderURL)
             } catch {
                 isMoving = false
                 moveError = error.localizedDescription
@@ -194,12 +196,51 @@ struct SummaryView: View {
                 session.discardPendingSave()
                 isMoving = false
                 moveComplete = true
-                resultMessage = "\(result.picks) picks and \(result.rejects) rejects moved across \(result.folders) folders"
+                resultMessage = Self.treeMoveResultMessage(result)
             } catch {
                 isMoving = false
                 moveError = error.localizedDescription
             }
         }
+    }
+
+    static func undecidedMessage(
+        count: Int, folderURL: URL?,
+        bundle: Bundle = Localization.bundle, locale: Locale = .current
+    ) -> String {
+        if let folderURL, let sortedFolder = SortedFolder(folderURL: folderURL) {
+            let parent = sortedFolder.parentURL.lastPathComponent
+            return String(localized: "\(count) undecided photos will move back to \(parent)/", bundle: bundle, locale: locale)
+        }
+        return String(localized: "\(count) photos are undecided. They will stay in place.", bundle: bundle, locale: locale)
+    }
+
+    static func moveResultMessage(
+        _ result: MoveResult, folderURL: URL,
+        bundle: Bundle = Localization.bundle, locale: Locale = .current
+    ) -> String {
+        if let sortedFolder = SortedFolder(folderURL: folderURL) {
+            let moved = sortedFolder.decision == .pick ? result.rejects : result.picks
+            let destination = sortedFolder.siblingURL.lastPathComponent
+            let parent = sortedFolder.parentURL.lastPathComponent
+            return String(localized: "\(moved) moved to \(destination)/, \(result.returnedToParent) moved back to \(parent)/", bundle: bundle, locale: locale)
+        }
+        let picks = StatusBar.countLabel(result.picks, kind: .picks, bundle: bundle, locale: locale)
+        let rejects = StatusBar.countLabel(result.rejects, kind: .rejects, bundle: bundle, locale: locale)
+        return String(localized: "\(picks) moved to Picks/, \(rejects) moved to Rejects/", bundle: bundle, locale: locale)
+    }
+
+    static func treeMoveResultMessage(
+        _ result: TreeMoveResult,
+        bundle: Bundle = Localization.bundle, locale: Locale = .current
+    ) -> String {
+        let picks = StatusBar.countLabel(result.picks, kind: .picks, bundle: bundle, locale: locale)
+        let rejects = StatusBar.countLabel(result.rejects, kind: .rejects, bundle: bundle, locale: locale)
+        if result.returnedToParent > 0 {
+            let returned = StatusBar.countLabel(result.returnedToParent, kind: .photos, bundle: bundle, locale: locale)
+            return String(localized: "Moved across \(result.folders) folders: \(picks), \(rejects), \(returned) returned to parent folders", bundle: bundle, locale: locale)
+        }
+        return String(localized: "Moved across \(result.folders) folders: \(picks), \(rejects)", bundle: bundle, locale: locale)
     }
 }
 

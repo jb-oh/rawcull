@@ -4,8 +4,10 @@ import Observation
 @MainActor
 @Observable
 final class CullSession {
-    var items: [PhotoItem] = []
-    var currentIndex: Int = 0
+    private(set) var items: [PhotoItem] = []
+    private(set) var currentIndex: Int = 0
+    private(set) var selectedItemIDs: Set<PhotoItem.ID> = []
+    private(set) var selectionAnchorIndex: Int = 0
     var isLoaded: Bool = false
     private(set) var pickCount: Int = 0
     private(set) var rejectCount: Int = 0
@@ -14,7 +16,15 @@ final class CullSession {
     private var saveTask: Task<Void, Never>?
     @ObservationIgnored
     private var hasPendingSave = false
+    @ObservationIgnored
+    private let writeSession: (SavedSession, URL) throws -> Void
     private(set) var folderURL: URL?
+
+    init(writeSession: @escaping (SavedSession, URL) throws -> Void = { saved, url in
+        try JSONEncoder().encode(saved).write(to: url, options: .atomic)
+    }) {
+        self.writeSession = writeSession
+    }
 
     // MARK: - Navigation
 
@@ -26,32 +36,100 @@ final class CullSession {
     var count: Int { items.count }
 
     func next() {
-        guard currentIndex < items.count - 1 else { return }
-        currentIndex += 1
+        jumpTo(index: min(currentIndex + 1, items.count - 1))
     }
 
     func previous() {
-        guard currentIndex > 0 else { return }
-        currentIndex -= 1
+        jumpTo(index: max(0, currentIndex - 1))
     }
 
     func jumpTo(index: Int) {
         guard items.indices.contains(index) else { return }
         currentIndex = index
+        collapseSelection()
+    }
+
+    // MARK: - Selection
+
+    var selectionCount: Int { selectedItemIDs.count }
+
+    var actionTargets: [PhotoItem] {
+        if selectionCount > 1 {
+            return items.filter { selectedItemIDs.contains($0.id) }
+        }
+        return currentItem.map { [$0] } ?? []
+    }
+
+    func isSelected(index: Int) -> Bool {
+        items.indices.contains(index) && selectedItemIDs.contains(items[index].id)
+    }
+
+    func select(index: Int, extendingRange: Bool = false, toggling: Bool = false) {
+        guard items.indices.contains(index) else { return }
+        if extendingRange {
+            let range = min(selectionAnchorIndex, index)...max(selectionAnchorIndex, index)
+            selectedItemIDs = Set(range.map { items[$0].id })
+            currentIndex = index
+        } else if toggling {
+            let id = items[index].id
+            if selectedItemIDs.contains(id) {
+                guard selectionCount > 1 else { return }
+                selectedItemIDs.remove(id)
+                if currentIndex == index {
+                    // Ascending indices keep the lower index when distances tie.
+                    currentIndex = items.indices.filter { isSelected(index: $0) }.min {
+                        abs($0 - index) < abs($1 - index)
+                    }!
+                }
+            } else {
+                selectedItemIDs.insert(id)
+                currentIndex = index
+            }
+            selectionAnchorIndex = currentIndex
+        } else {
+            jumpTo(index: index)
+        }
+    }
+
+    /// Returns whether Escape should be consumed.
+    @discardableResult
+    func collapseSelection() -> Bool {
+        let hadMultipleSelection = selectionCount > 1
+        selectedItemIDs = Set(currentItem.map { [$0.id] } ?? [])
+        selectionAnchorIndex = currentIndex
+        return hadMultipleSelection
+    }
+
+    func contextMenuTargets(index: Int) -> [PhotoItem] {
+        guard items.indices.contains(index) else { return [] }
+        return selectionCount > 1 && isSelected(index: index) ? actionTargets : [items[index]]
     }
 
     // MARK: - Decisions
 
     func markPick() {
-        applyDecision(.pick)
+        applyDecision(.pick, to: actionTargets.map(\.id))
     }
 
     func markReject() {
-        applyDecision(.reject)
+        applyDecision(.reject, to: actionTargets.map(\.id))
     }
 
     func unmarkCurrent() {
-        applyDecision(.undecided)
+        applyDecision(.undecided, to: actionTargets.map(\.id))
+    }
+
+    func applyDecision(_ newDecision: Decision, to targetIDs: [PhotoItem.ID]) {
+        let targets = Set(targetIDs)
+        var changed = false
+        for index in items.indices where targets.contains(items[index].id) {
+            let oldDecision = items[index].decision
+            guard oldDecision != newDecision else { continue }
+            updateCounts(from: oldDecision, to: newDecision)
+            items[index].decision = newDecision
+            changed = true
+        }
+        if changed { scheduleSave() }
     }
 
     // MARK: - Session Loading
@@ -60,17 +138,14 @@ final class CullSession {
         flushSave()
         self.folderURL = folderURL
 
-        // Check for existing session
-        if let saved = SavedSession.load(from: folderURL) {
-            self.items = fileURLs.map { url in
-                let decision = saved.decisions[url.lastPathComponent] ?? .undecided
-                return PhotoItem(url: url, decision: decision)
-            }
-            self.currentIndex = max(0, min(saved.currentIndex, fileURLs.count - 1))
-        } else {
-            self.items = fileURLs.map { PhotoItem(url: $0) }
-            self.currentIndex = 0
+        let saved = SavedSession.load(from: folderURL)
+        let defaultDecision = SortedFolder(folderURL: folderURL)?.decision ?? .undecided
+        self.items = fileURLs.map { url in
+            let decision = saved?.decisions[url.lastPathComponent] ?? defaultDecision
+            return PhotoItem(url: url, decision: decision)
         }
+        self.currentIndex = max(0, min(saved?.currentIndex ?? 0, fileURLs.count - 1))
+        collapseSelection()
 
         rebuildCounts()
         self.isLoaded = true
@@ -82,6 +157,7 @@ final class CullSession {
         hasPendingSave = false
         items = []
         currentIndex = 0
+        collapseSelection()
         pickCount = 0
         rejectCount = 0
         undecidedCount = 0
@@ -130,8 +206,7 @@ final class CullSession {
             currentIndex: currentIndex,
             decisions: decisions
         )
-        if let data = try? JSONEncoder().encode(saved),
-           (try? data.write(to: sessionURL, options: .atomic)) != nil {
+        if (try? writeSession(saved, sessionURL)) != nil {
             hasPendingSave = false
         }
     }
@@ -143,13 +218,6 @@ final class CullSession {
         guard let folderURL else { return }
         let sessionURL = SavedSession.url(in: folderURL)
         try? FileManager.default.removeItem(at: sessionURL)
-    }
-
-    private func applyDecision(_ newDecision: Decision) {
-        guard let item = currentItem, item.decision != newDecision else { return }
-        updateCounts(from: item.decision, to: newDecision)
-        items[currentIndex].decision = newDecision
-        scheduleSave()
     }
 
     private func rebuildCounts() {

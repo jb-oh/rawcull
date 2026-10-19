@@ -34,7 +34,6 @@ struct ContentView: View {
                     folderTree: folderTree,
                     onSelectFolder: switchFolder,
                     onFinish: { appState = .done },
-                    onCloseFolder: closeFolder,
                     expandedFolderURLs: $expandedFolderURLs,
                     loading: folderLoading
                 )
@@ -50,6 +49,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 800, minHeight: 600)
         .favrenWindowBackground()
+        .focusedSceneValue(\.closeFolder, closeFolderAction)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             session.flushSave()
         }
@@ -66,6 +66,11 @@ struct ContentView: View {
     }
 
     // MARK: - Flow
+
+    private var closeFolderAction: (() -> Void)? {
+        guard rootURL != nil else { return nil }
+        return closeFolder
+    }
 
     private func startCulling(folderURL: URL, fileURLs: [URL]) {
         rootURL = folderURL
@@ -139,6 +144,11 @@ struct ContentView: View {
             return
         }
         isContinuing = true
+        // A directly opened sorted folder can send photos outside the current tree.
+        if let rootURL, let sortedRoot = SortedFolder(folderURL: rootURL) {
+            self.rootURL = sortedRoot.parentURL
+            expandedFolderURLs.insert(sortedRoot.parentURL)
+        }
         expandedFolderURLs.insert(current)
         loadFolder(current) {
             isContinuing = false

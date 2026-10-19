@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "RawCull",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -12,7 +13,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "RawCull",
-            dependencies: ["FavrenUI"]
+            dependencies: ["FavrenUI"],
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "RawCullTests",

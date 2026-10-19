@@ -4,6 +4,8 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
+  developmentLanguage: en
+  knownRegions: [en, ko, Base]
 packages:
   FavrenUI:
     path: ../favren-works/brand/apple/FavrenUI
@@ -33,5 +35,11 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: RawCull
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
         SWIFT_VERSION: "6.0"
+        SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO
+      configs:
+        # scripts/package.sh signs Release with Developer ID and notarizes it, which requires
+        # the hardened runtime. The team ID comes from ~/.config/favren/asc.env at build time.
+        Release:
+          ENABLE_HARDENED_RUNTIME: YES
